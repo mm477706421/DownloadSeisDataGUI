@@ -36,12 +36,12 @@ priority_order = {'L': 0, 'B': 1, 'H': 2, 'E': 3}
 ##### END OF USER INPUT #####
 client = Client('IRIS')
 
-
-inventory = client.get_stations(network=network_code,
-                                channel=channel_query,
-                                starttime=network_starttime,
-                                endtime=network_endtime,
-                                level='channel')
+# 将inventory的获取移动到main()函数中
+# inventory = client.get_stations(network=network_code,
+#                               channel=channel_query,
+#                               starttime=network_starttime,
+#                               endtime=network_endtime,
+#                               level='channel')
 
 # 定义全局变量存储处理结果
 stations_code           = []
@@ -116,6 +116,13 @@ def create_dataframe():
 
 def main():
     """主函数，用于直接运行脚本时执行"""
+    # 在这里获取inventory，确保只有在直接运行脚本时才会执行
+    inventory = client.get_stations(network=network_code,
+                                  channel=channel_query,
+                                  starttime=network_starttime,
+                                  endtime=network_endtime,
+                                  level='channel')
+                                  
     for network in inventory:
         global stations_latitude, stations_longitude, stations_elevation
         
