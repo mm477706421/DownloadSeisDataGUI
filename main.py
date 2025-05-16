@@ -14,6 +14,7 @@ from obspy.clients.fdsn import Client
 from obspy.io.sac import SACTrace
 from obspy.taup import TauPyModel
 from obspy.geodetics import gps2dist_azimuth, kilometer2degrees
+import numpy as np
 
 # 不在启动时导入模块，而是在需要时才导入
 # sys.path.append(os.path.join(os.path.dirname(__file__), 'Python'))
@@ -271,6 +272,144 @@ class WorkerThread(QThread):
                 # 这样可以避免运行可能导致问题的全局代码
                 
                 # 此处实现a3_get_catalog的主要功能...
+                # 读取元数据
+                metadata = pd.read_csv(a3_get_catalog.metadatafile, sep='\t', index_col=0)
+                
+                stations = metadata['station']
+                stations_starttime = metadata['starttime']
+                stations_endtime = metadata['endtime']
+                stations_latitude = metadata['latitude']
+                stations_longitude = metadata['longitude']
+                
+                # 确保目录存在
+                if not os.path.exists(a3_get_catalog.output_dir):
+                    os.makedirs(a3_get_catalog.output_dir)
+                
+                if not os.path.exists(f'{a3_get_catalog.output_dir}/{a3_get_catalog.network}'):
+                    os.makedirs(f'{a3_get_catalog.output_dir}/{a3_get_catalog.network}')
+
+                # 连接IRIS服务器
+                client = a3_get_catalog.client
+                self.statusUpdate.emit("连接IRIS服务器...")
+
+                # 更新进度条设置
+                total_stations = len(stations)
+                self.statusUpdate.emit(f"找到 {total_stations} 个台站")
+
+                # 处理每个台站
+                for ista, station in enumerate(stations):
+                    self.statusUpdate.emit(f"处理台站: {station} ({ista+1}/{total_stations})")
+                    
+                    sta_lat = stations_latitude[ista]
+                    sta_lon = stations_longitude[ista]
+                    
+                    # 处理时间字段可能为"未知"的情况
+                    try:
+                        starttime = UTCDateTime(stations_starttime[ista])
+                        endtime = UTCDateTime(stations_endtime[ista])
+                        
+                        try:
+                            # 获取本地地震目录
+                            self.statusUpdate.emit(f"获取台站 {station} 的本地地震目录...")
+                            cata_local = client.get_events(
+                                starttime=starttime, 
+                                endtime=endtime, 
+                                minmagnitude=a3_get_catalog.minmag_local, 
+                                maxmagnitude=a3_get_catalog.maxmag_local,
+                                latitude=sta_lat, 
+                                longitude=sta_lon, 
+                                maxradius=a3_get_catalog.maxradius_local
+                            )
+                            
+                            # 获取全球地震目录
+                            self.statusUpdate.emit(f"获取台站 {station} 的全球地震目录...")
+                            cata_global = client.get_events(
+                                starttime=starttime, 
+                                endtime=endtime, 
+                                minmag=a3_get_catalog.minmag_global
+                            )
+                            
+                            # 合并目录
+                            catalog = cata_local + cata_global
+                            
+                            eventids = []
+                            otimes_str = []
+                            magnitude_types = []
+                            descriptions = []
+                            events_latitude = np.empty(len(catalog))
+                            events_longitude = np.empty(len(catalog))
+                            events_depth = np.empty(len(catalog))
+                            magnitudes = np.empty(len(catalog))
+                            
+                            self.statusUpdate.emit(f"处理 {len(catalog)} 个地震事件...")
+                            
+                            # 处理每个事件
+                            for ievt, event in enumerate(catalog):
+                                eventid = event.resource_id.id.split('eventid=')[-1]
+                                origin = event.origins[0]
+                                
+                                # 处理origin.time为空的情况
+                                if origin.time is None:
+                                    otime_str = "未知"
+                                else:
+                                    otime_str = origin.time.__unicode__()
+                                    
+                                event_latitude = origin.latitude
+                                event_longitude = origin.longitude
+                                event_depth = origin.depth * 0.001  # 转换为km
+                                
+                                # 处理magnitudes可能为空的情况
+                                if len(event.magnitudes) > 0:
+                                    magnitude_type = event.magnitudes[0].magnitude_type
+                                    magnitude = event.magnitudes[0].mag
+                                else:
+                                    magnitude_type = "未知"
+                                    magnitude = 0.0
+                                
+                                # 处理event_descriptions为空的情况
+                                if not event.event_descriptions or len(event.event_descriptions) == 0:
+                                    description = "未知"
+                                else:
+                                    description = event.event_descriptions[0].text
+                                
+                                eventids.append(eventid)
+                                otimes_str.append(otime_str)
+                                magnitude_types.append(magnitude_type)
+                                descriptions.append(description)
+                                events_latitude[ievt] = event_latitude
+                                events_longitude[ievt] = event_longitude
+                                events_depth[ievt] = event_depth
+                                magnitudes[ievt] = magnitude
+                            
+                            # 创建DataFrame并保存
+                            df = pd.DataFrame({
+                                'event id': eventids, 
+                                'origin time': otimes_str,
+                                'latitude': events_latitude, 
+                                'longitude': events_longitude, 
+                                'depth': events_depth,
+                                'magnitude type': magnitude_types, 
+                                'magnitude': magnitudes, 
+                                'description': descriptions
+                            })
+                            
+                            filename = f'{a3_get_catalog.output_dir}/{a3_get_catalog.network}/{a3_get_catalog.network}_{station}_catalog.txt'
+                            df.to_csv(filename, sep='\t', float_format='%.6f')
+                            self.statusUpdate.emit(f"目录已保存到 {filename}")
+                            
+                        except Exception as e:
+                            self.statusUpdate.emit(f"错误: {str(e)}")
+                            self.statusUpdate.emit(f"无法下载台站 {station} 的地震目录，跳过!")
+                    
+                    except Exception as e:
+                        self.statusUpdate.emit(f"错误: {str(e)}")
+                        self.statusUpdate.emit(f"台站 {station} 的时间信息无效，跳过!")
+                    
+                    # 更新进度
+                    progress = int(100 * (ista + 1) / total_stations)
+                    self.progressUpdate.emit(progress)
+
+                self.statusUpdate.emit("地震目录获取完成！")
                 
             elif self.task_type == "eventdata":
                 self.statusUpdate.emit("正在下载事件数据...")

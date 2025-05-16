@@ -61,8 +61,18 @@ def process_station(station):
     
     station_code      = station.code
     station_site      = station.site.name
-    station_starttime = station.start_date.__unicode__()
-    station_endtime   = station.end_date.__unicode__()
+    
+    # 添加对None值的处理
+    if station.start_date is None:
+        station_starttime = "未知"
+    else:
+        station_starttime = station.start_date.__unicode__()
+        
+    if station.end_date is None:
+        station_endtime = "未知"
+    else:
+        station_endtime = station.end_date.__unicode__()
+        
     station_latitude  = station.latitude
     station_longitude = station.longitude
     station_elevation = station.elevation

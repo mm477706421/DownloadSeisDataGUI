@@ -95,13 +95,24 @@ for ista in tqdm(range(len(stations))):
             
             eventid         = event.resource_id.id.split('eventid=')[-1]
             origin          = event.origins[0]      
-            otime_str       = origin.time.__unicode__()
+            
+            # 处理origin.time为空的情况
+            if origin.time is None:
+                otime_str = "未知"
+            else:
+                otime_str = origin.time.__unicode__()
+                
             event_latitude  = origin.latitude
             event_longitude = origin.longitude     
             event_depth     = origin.depth*0.001   # The unit of depth is km      
             magnitude_type  = event.magnitudes[0].magnitude_type
             magnitude       = event.magnitudes[0].mag
-            description     = event.event_descriptions[0].text
+            
+            # 处理event_descriptions为空或索引越界的情况
+            if not event.event_descriptions or len(event.event_descriptions) == 0:
+                description = "未知"
+            else:
+                description = event.event_descriptions[0].text
             
             
             eventids.append(eventid)
