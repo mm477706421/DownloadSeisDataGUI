@@ -5,8 +5,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QTabWidget, QLabel, QLineEdit, 
                              QPushButton, QTextEdit, QGroupBox, QGridLayout, 
                              QComboBox, QFileDialog, QCheckBox, QProgressBar,
-                             QListWidget, QMessageBox)
+                             QListWidget, QMessageBox, QAction, QToolBar)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QIcon
 from datetime import datetime, timedelta
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
@@ -833,6 +834,12 @@ class SeismicDataDownloader(QMainWindow):
         self.setWindowTitle('地震数据下载工具')
         self.setGeometry(100, 100, 900, 700)
         
+        # 创建工具栏
+        self.create_toolbar()
+        
+        # 创建状态栏
+        self.statusBar().showMessage('就绪')
+        
         # 创建中央部件
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -845,6 +852,7 @@ class SeismicDataDownloader(QMainWindow):
         main_layout.addWidget(self.tabs)
         
         # 创建各个选项卡
+        self.create_home_tab()  # 添加主页选项卡
         self.create_metadata_tab()
         self.create_daydata_tab()
         self.create_catalog_tab()
@@ -864,6 +872,141 @@ class SeismicDataDownloader(QMainWindow):
         status_box.setLayout(status_layout)
         
         main_layout.addWidget(status_box)
+        
+    def create_toolbar(self):
+        """创建工具栏"""
+        self.toolbar = QToolBar("主工具栏")
+        self.addToolBar(self.toolbar)
+        
+        # 打开数据目录操作
+        open_data_action = QAction("打开数据目录", self)
+        open_data_action.setStatusTip("打开存储数据的目录")
+        open_data_action.triggered.connect(self.open_data_folder)
+        self.toolbar.addAction(open_data_action)
+        
+        # 打开目录目录操作
+        open_catalog_action = QAction("打开目录目录", self)
+        open_catalog_action.setStatusTip("打开存储地震目录的目录")
+        open_catalog_action.triggered.connect(self.open_catalog_folder)
+        self.toolbar.addAction(open_catalog_action)
+        
+        self.toolbar.addSeparator()
+        
+        # 检查IRIS连接
+        check_iris_action = QAction("检查IRIS连接", self)
+        check_iris_action.setStatusTip("检查与IRIS数据中心的连接")
+        check_iris_action.triggered.connect(self.check_iris_connection)
+        self.toolbar.addAction(check_iris_action)
+        
+        self.toolbar.addSeparator()
+        
+        # 帮助操作
+        help_action = QAction("帮助", self)
+        help_action.setStatusTip("显示帮助信息")
+        help_action.triggered.connect(lambda: self.tabs.setCurrentIndex(0))  # 切换到主页选项卡
+        self.toolbar.addAction(help_action)
+        
+        # 关于操作
+        about_action = QAction("关于", self)
+        about_action.setStatusTip("关于此程序")
+        about_action.triggered.connect(self.show_about)
+        self.toolbar.addAction(about_action)
+        
+    def open_data_folder(self):
+        """打开数据目录"""
+        data_path = os.path.join(os.getcwd(), "DATA")
+        if not os.path.exists(data_path):
+            os.makedirs(data_path)
+        QFileDialog.getOpenFileName(self, "打开数据目录", data_path)
+        # 在Windows上尝试直接打开资源管理器
+        os.startfile(data_path) if os.name == 'nt' else os.system(f'xdg-open "{data_path}"')
+        
+    def open_catalog_folder(self):
+        """打开目录目录"""
+        catalog_path = os.path.join(os.getcwd(), "catalog")
+        if not os.path.exists(catalog_path):
+            os.makedirs(catalog_path)
+        QFileDialog.getOpenFileName(self, "打开目录目录", catalog_path)
+        # 在Windows上尝试直接打开资源管理器
+        os.startfile(catalog_path) if os.name == 'nt' else os.system(f'xdg-open "{catalog_path}"')
+        
+    def check_iris_connection(self):
+        """检查与IRIS数据中心的连接"""
+        try:
+            client = Client('IRIS')
+            QMessageBox.information(self, "连接状态", "与IRIS数据中心的连接正常。")
+            self.update_status("IRIS连接检查成功！")
+        except Exception as e:
+            QMessageBox.critical(self, "连接状态", f"无法连接到IRIS数据中心：{str(e)}")
+            self.update_status(f"IRIS连接检查失败：{str(e)}")
+            
+    def show_about(self):
+        """显示关于对话框"""
+        QMessageBox.about(self, "关于", 
+                          "地震数据下载工具\n\n"
+                          "版本：1.0\n"
+                          "作者：吴悦初 (12131066@mail.sustech.edu.cn)\n\n"
+                          "基于PyQt5和ObsPy开发，用于自动下载和处理地震数据。")
+        
+    def create_home_tab(self):
+        """创建主页选项卡，提供使用指南和帮助信息"""
+        tab = QWidget()
+        layout = QVBoxLayout()
+        
+        # 欢迎标题
+        welcome_label = QLabel("欢迎使用地震数据下载工具")
+        welcome_label.setStyleSheet("font-size: 18pt; font-weight: bold;")
+        welcome_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(welcome_label)
+        
+        # 使用指南
+        guide_group = QGroupBox("使用指南")
+        guide_layout = QVBoxLayout()
+        
+        guide_text = QTextEdit()
+        guide_text.setReadOnly(True)
+        guide_text.setHtml("""
+        <p style='font-size: 11pt;'>本工具用于从IRIS数据中心下载和处理地震数据。请按照以下步骤操作：</p>
+        <ol style='font-size: 11pt;'>
+            <li><b>获取台站元数据</b>：首先打开"获取台站元数据"选项卡，设置网络代码、时间范围和通道查询参数，然后点击"获取台站元数据"按钮。</li>
+            <li><b>获取地震目录</b>：接着打开"获取地震目录"选项卡，设置参数后点击"获取地震目录"按钮。</li>
+            <li><b>下载数据</b>：您可以选择以下两种方式之一下载数据：
+                <ul>
+                    <li>打开"下载日数据"选项卡，下载连续的日数据。</li>
+                    <li>打开"下载事件数据"选项卡，直接下载地震事件数据。</li>
+                </ul>
+            </li>
+            <li><b>截取事件数据</b>：如果您已经下载了日数据，可以打开"截取事件数据"选项卡，从日数据中提取事件数据。</li>
+        </ol>
+        <p style='font-size: 11pt;'>在每个选项卡中，设置好参数后点击相应的按钮开始执行任务。下载和处理过程的进度和状态将显示在窗口底部。</p>
+        """)
+        guide_layout.addWidget(guide_text)
+        guide_group.setLayout(guide_layout)
+        layout.addWidget(guide_group)
+        
+        # 关于部分
+        about_group = QGroupBox("关于")
+        about_layout = QVBoxLayout()
+        
+        about_text = QTextEdit()
+        about_text.setReadOnly(True)
+        about_text.setHtml("""
+        <p style='font-size: 11pt;'>作者：吴悦初 (12131066@mail.sustech.edu.cn)</p>
+        <p style='font-size: 11pt;'>本工具基于PyQt5和ObsPy开发，用于自动下载和处理地震数据。</p>
+        <p style='font-size: 11pt;'>如有问题或建议，请联系作者。</p>
+        """)
+        about_layout.addWidget(about_text)
+        about_group.setLayout(about_layout)
+        layout.addWidget(about_group)
+        
+        # 开始按钮
+        start_button = QPushButton("开始使用 >>")
+        start_button.setStyleSheet("font-size: 12pt; padding: 10px;")
+        start_button.clicked.connect(lambda: self.tabs.setCurrentIndex(1))  # 点击后切换到元数据选项卡
+        layout.addWidget(start_button)
+        
+        tab.setLayout(layout)
+        self.tabs.addTab(tab, "主页")
         
     def create_metadata_tab(self):
         tab = QWidget()
@@ -1213,11 +1356,21 @@ class SeismicDataDownloader(QMainWindow):
         self.statusText.append(message)
         # 滚动到底部
         self.statusText.verticalScrollBar().setValue(self.statusText.verticalScrollBar().maximum())
+        # 更新状态栏
+        self.statusBar().showMessage(message)
         
     def update_progress(self, value):
         self.progressBar.setValue(value)
         
     def run_get_metadata(self):
+        # 显示确认对话框
+        reply = QMessageBox.question(self, '确认操作', 
+                                      '即将开始获取台站元数据，这个过程可能需要几分钟时间。\n\n确定要继续吗？',
+                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        
+        if reply == QMessageBox.No:
+            return
+            
         # 从UI获取参数
         from obspy import UTCDateTime
         params = {
@@ -1238,6 +1391,14 @@ class SeismicDataDownloader(QMainWindow):
         self.worker.start()
         
     def run_download_daydata(self):
+        # 显示确认对话框
+        reply = QMessageBox.question(self, '确认操作', 
+                                      '即将开始下载日数据，这个过程可能需要较长时间（取决于数据量大小）。\n\n确定要继续吗？',
+                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        
+        if reply == QMessageBox.No:
+            return
+            
         # 从UI获取参数
         params = {
             "output_dir": self.daydata_output_dir.text(),
@@ -1260,6 +1421,14 @@ class SeismicDataDownloader(QMainWindow):
         self.worker.start()
         
     def run_get_catalog(self):
+        # 显示确认对话框
+        reply = QMessageBox.question(self, '确认操作', 
+                                      '即将开始获取地震目录，这个过程可能需要几分钟时间。\n\n确定要继续吗？',
+                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        
+        if reply == QMessageBox.No:
+            return
+            
         # 从UI获取参数
         params = {
             "output_dir": self.catalog_output_dir.text(),
@@ -1282,6 +1451,14 @@ class SeismicDataDownloader(QMainWindow):
         self.worker.start()
         
     def run_download_eventdata(self):
+        # 显示确认对话框
+        reply = QMessageBox.question(self, '确认操作', 
+                                      '即将开始下载事件数据，这个过程可能需要较长时间（取决于事件数量）。\n\n确定要继续吗？',
+                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        
+        if reply == QMessageBox.No:
+            return
+            
         # 从UI获取参数
         rayleigh_vel = [float(x) for x in self.event_rayleigh_vel.text().split(',')]
         params = {
@@ -1308,6 +1485,14 @@ class SeismicDataDownloader(QMainWindow):
         self.worker.start()
         
     def run_cut_eventdata(self):
+        # 显示确认对话框
+        reply = QMessageBox.question(self, '确认操作', 
+                                      '即将开始从日数据中截取事件数据，这个过程可能需要一些时间。\n\n确定要继续吗？',
+                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        
+        if reply == QMessageBox.No:
+            return
+            
         # 从UI获取参数
         rayleigh_vel = [float(x) for x in self.cut_rayleigh_vel.text().split(',')]
         params = {
@@ -1335,11 +1520,16 @@ class SeismicDataDownloader(QMainWindow):
         
     def on_worker_finished(self):
         self.update_status("任务完成！")
+        # 更新状态栏
+        self.statusBar().showMessage("任务完成 - 就绪")
         QMessageBox.information(self, "完成", "操作已完成！")
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     ex = SeismicDataDownloader()
+    # 显示主界面
     ex.show()
+    # 在这里显示一条欢迎消息，告诉用户如何开始
+    ex.update_status("欢迎使用地震数据下载工具！请选择相应的选项卡，设置参数后点击对应的按钮开始下载。")
     sys.exit(app.exec_()) 
