@@ -1,5 +1,77 @@
 <div align=center><img src="FIGURE/logo.png" width="256"/></div>
 
+# 地震数据下载工具 (DownloadSeisDataGUI)
+
+这是一个基于PyQt5开发的地震数据下载工具图形界面，用于从IRIS数据中心下载和处理地震数据。
+
+作者：吴悦初 (12131066@mail.sustech.edu.cn)
+
+## 功能特点
+
+该工具包含五个主要功能模块：
+
+1. **获取台站元数据**：下载地震台站的元数据信息
+2. **下载日数据**：下载指定台站的连续日数据
+3. **获取地震目录**：获取指定区域和时间范围内的地震目录
+4. **下载事件数据**：根据地震目录下载事件波形数据
+5. **截取事件数据**：从已下载的日数据中截取事件数据
+
+## 安装依赖
+
+本程序依赖以下Python库：
+
+```bash
+pip install PyQt5 numpy pandas obspy tqdm
+```
+
+## 使用方法
+
+1. 运行主程序：
+
+```bash
+python main.py
+```
+
+2. 界面会显示五个选项卡，对应五个主要功能。按照顺序执行这些功能：
+
+   - 首先获取台站元数据
+   - 然后获取地震目录
+   - 接下来可以选择下载日数据或者直接下载事件数据
+   - 如果已经下载了日数据，可以使用"截取事件数据"功能从日数据中提取事件数据
+
+3. 每个选项卡中的参数都有默认值，可以根据需要进行修改。
+
+## 数据目录结构
+
+程序会创建以下目录结构：
+
+```
+.
+├── XO_fdsn_metadata.txt          # 台站元数据文件
+├── catalog/                      # 地震目录目录
+│   └── XO/                       # 网络代码
+│       └── XO_WD58_catalog.txt   # 台站的地震目录
+├── DATA/
+│   ├── sacdata_day/              # 日数据目录
+│   │   └── XO/                   # 网络代码
+│   │       └── WD58/             # 台站代码
+│   │           └── ...           # 日数据文件
+│   └── sacdata_event/            # 事件数据目录
+│       └── 20181005_123456/      # 事件ID（时间格式）
+│           └── ...               # 事件数据文件
+```
+
+## 注意事项
+
+1. 下载大量数据可能需要较长时间，请耐心等待。
+2. 建议先下载少量台站的数据进行测试，确认一切正常后再下载更多数据。
+3. 可能需要稳定的网络连接以确保数据下载完整。
+4. 程序会自动跳过已经存在的文件，因此如果下载中断，可以直接重新运行相同参数的下载任务继续完成下载。
+
+## 许可证
+
+MIT License
+
 # DownloadSeisData
 
 `DownloadSeisData` is a software package that automatically downloads seismic data. We strongly recommend using the Python version based on [ObsPy](https://github.com/obspy/obspy). It can automatically download station metadata, daily waveform data, and instrument responses. In addition, it can also download earthquake catalogs and waveform data of earthquake events based on station metadata. All waveform data is saved in `SAC` format. Since the corresponding response file is downloaded, We can convert the units of the waveform to displacement, velocity, acceleration (seismometer), or pressure (pressure gauge). At the same time, `DownloadSeisData` also saves station information and event information in the SAC header for subsequent use.
