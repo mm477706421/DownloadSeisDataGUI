@@ -4,7 +4,9 @@
 
 这是一个基于PyQt5开发的地震数据下载工具图形界面，用于从IRIS数据中心下载和处理地震数据。
 
-作者：吴悦初 (12131066@mail.sustech.edu.cn)
+原作者：吴悦初 (12131066@mail.sustech.edu.cn)
+
+Fork: https://github.com/SeisPiano/DownloadSeisData
 
 ## 功能特点
 
